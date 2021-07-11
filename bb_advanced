@@ -1,0 +1,102 @@
+#include <amxmodx>
+#include <engine>
+#include <fun>
+#include <hamsandwich>
+
+new Float:pStrafe[33][3]
+new Float:speed_holder[33]
+
+new bool:g_pBhopping[33]
+new Detect[33]
+
+#define TASK_BHOP 001234
+#define TASK_CHECK 000123
+
+public plugin_init(){
+	register_plugin("Bhop Detect","1.0","Cr@sh")
+	
+	RegisterHam(Ham_Spawn, "player", "player_spawn", 1)
+	RegisterHam(Ham_Player_Jump, "player", "player_jump", 0)
+}
+
+public client_connect(id){
+	g_pBhopping[id] = false
+	Detect[id] = 0
+}
+
+public player_spawn(id){
+	remove_task(id+TASK_CHECK)
+	set_task(0.1,"bhop_check",id+TASK_CHECK,_,_,"b")
+}
+
+public bhop_check(id){
+	id -= TASK_CHECK
+	
+	if(is_user_bot(id) || !is_user_alive(id) || !is_user_connected(id)){
+		remove_task(id+TASK_CHECK)
+		return PLUGIN_HANDLED
+	}
+	
+	static Float:aim[3], detect_id
+	
+	entity_get_vector(id, EV_VEC_angles, aim)
+	
+	detect_id = Detect[id]
+	
+	if(aim[0] == pStrafe[id][0] && aim[1] == pStrafe[id][1])
+		detect_id -= 12
+	else
+		detect_id++
+	
+	Detect[id] = detect_id
+	CopyVector(aim,pStrafe[id])
+	
+	return PLUGIN_HANDLED
+}
+
+public player_jump(id){
+	if(Detect[id] < 0)
+		Detect[id] = 0
+	
+	if(Detect[id] > 25){
+		if(g_pBhopping[id] == false){
+			speed_holder[id] = get_user_maxspeed(id)
+			set_user_maxspeed(id, get_user_maxspeed(id) / 3)
+		
+			set_task(1.5,"return_speed",id+TASK_BHOP,_,_,"a",1)
+			
+			message_begin(id ? MSG_ONE : MSG_ALL, get_user_msgid( "ScreenFade"), {0, 0, 0}, id)
+			write_short(floatround(4096.0 * 1.5, floatround_round))
+			write_short(floatround(4096.0 * 1.5, floatround_round))
+			write_short(4096)
+			write_byte(255)
+			write_byte(85)
+			write_byte(85)
+			write_byte(40)
+			message_end()
+			
+			set_dhudmessage(211, 211, 211, 0.07, 0.60, 2, 6.0, 2.0,0.05)
+			show_dhudmessage(id, "BHOP is forbidden!")
+			
+			client_cmd(id, "spk fvox/bell")
+	
+			g_pBhopping[id] = true
+			Detect[id] = 0
+		}
+	}
+}
+
+public return_speed(id){
+	id -= TASK_BHOP
+	
+	if(is_user_alive(id) && is_user_connected(id))
+		set_user_maxspeed(id, speed_holder[id])	
+	
+	g_pBhopping[id] = false
+}
+
+CopyVector(Float:Vec1[3],Float:Vec2[3]){
+	Vec2[0] = Vec1[0]
+	Vec2[1] = Vec1[1]
+	Vec2[2] = Vec1[2]
+}
